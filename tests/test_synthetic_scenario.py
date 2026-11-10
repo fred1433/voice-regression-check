@@ -104,3 +104,34 @@ def test_cli_exit_codes_and_report_drive_the_terminal(tmp_path):
     assert missing_arg.returncode == 2
     same = subprocess.run(cmd[:5] + ["fixtures/baseline.jsonl", "--policy", POLICY], capture_output=True, text=True)
     assert same.returncode == 0
+
+
+def test_known_cause_is_not_confirmed_when_it_does_not_match(tmp_path):
+    """A declared cause that points at other sessions or another stage must not be 'matched'."""
+    import shutil
+
+    for name, edit in (
+        ("other-sessions", lambda m: m["injected_change"].update(sessions=["s001", "s002"])),
+        ("other-stage", lambda m: m["injected_change"].update(contribution_key="speech_synthesis")),
+    ):
+        d = tmp_path / name
+        d.mkdir()
+        shutil.copy("fixtures/candidate.jsonl", d / "candidate.jsonl")
+        m = json.load(open("fixtures/candidate.manifest.json"))
+        edit(m)
+        (d / "candidate.manifest.json").write_text(json.dumps(m))
+        rep = compare(load_run("fixtures/baseline.jsonl"), load_run(d / "candidate.jsonl"), load_policy(POLICY))
+        assert rep["change"]["known_cause"]["matches_diagnosis"] is False, name
+        assert rep["change"]["primary_contribution"] == "llm_inference"  # read from the logs, not from the manifest
+
+
+def test_no_known_cause_outside_synthetic_runs(tmp_path):
+    import shutil
+
+    shutil.copy("fixtures/candidate.jsonl", tmp_path / "candidate.jsonl")
+    m = json.load(open("fixtures/candidate.manifest.json"))
+    m["provenance"] = "local-capture"
+    (tmp_path / "candidate.manifest.json").write_text(json.dumps(m))
+    rep = compare(load_run("fixtures/baseline.jsonl"), load_run(tmp_path / "candidate.jsonl"), load_policy(POLICY))
+    # the log still says synthetic, so the manifest is rejected as inconsistent: no verdict, no cause
+    assert rep["verdict"] == "INCOMPLETE" and rep["change"] is None

@@ -12,7 +12,7 @@ def _ms(v) -> str:
 def _dist(d: dict) -> str:
     med = "failed turn" if d.get("median_is_failed_turn") else _ms(d.get("median_ms"))
     if d.get("p95_ms") is None and d.get("p95_note"):
-        p95 = d["p95_note"]
+        return f"median {med}, {d['p95_note']}"
     elif d.get("p95_is_failed_turn"):
         p95 = "p95 is a failed turn"
     else:
