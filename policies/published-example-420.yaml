@@ -1,0 +1,46 @@
+schema: voice-check.policy
+schema_version: 1
+name: published-example-420
+
+source:
+  publisher: Bearworks
+  title: "Sub-500ms Voice Agents: Optimizing the Full STT-LLM-TTS Pipeline"
+  author: Greg M
+  date: "2026-10-14"
+  url: https://www.bearworks.com/post/sub-500ms-voice-agents-stt-llm-tts-latency
+
+nature: illustrative budget
+note: >-
+  Illustrative budget from Bearworks' 14 Oct 2026 post, which calls its figures
+  "proposed engineering budgets, not measured Bearworks performance".
+  Applying it at p95 is this demo's choice.
+
+# The only rule evaluated.
+rule:
+  measure: turn_total   # LatencyBreakdown.total_secs of user turns (measured_from: user_silence)
+  statistic: p95        # nearest rank, ceil(0.95 * N)
+  operator: "<="
+  threshold_ms: 420
+
+# Below this N no p95 is shown and the verdict is INCOMPLETE. A floor, not a
+# statistical guarantee; the post's own rule of thumb is that "a p95 is only
+# meaningful with a few hundred turns per configuration".
+min_measured_turns: 300
+
+# Expected turns with no measurement (missing from the log, or interrupted
+# before any response) allowed before the verdict becomes INCOMPLETE.
+max_incomplete_turns: 0
+
+# Informative only, copied from the post's table ("Streaming target" column).
+# Never evaluated: changing these values cannot change a verdict.
+published_breakdown:
+  - component: "Remaining turn detection and STT processing"
+    streaming_target_ms: 120
+  - component: "LLM response generation / time to first token"
+    streaming_target_ms: 120
+  - component: "TTS synthesis / time to first audio"
+    streaming_target_ms: 100
+  - component: "Network, buffering and playback"
+    streaming_target_ms: 80
+  - component: "Total"
+    streaming_target_ms: 420

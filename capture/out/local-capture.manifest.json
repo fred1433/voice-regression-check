@@ -1,0 +1,285 @@
+{
+  "schema": "voice-check.manifest",
+  "schema_version": 1,
+  "run_id": "local-capture-20261110T112711",
+  "config_id": "whisper-base-cpu+ollama-qwen2.5:3b+kokoro",
+  "scenario_id": "local-4-utterances-v1",
+  "provenance": "local-capture",
+  "inference_backend": "ollama",
+  "framework": "pipecat-ai",
+  "framework_version": "1.15.0",
+  "started_at": "2026-11-10T11:27:11-0300",
+  "conditions": {
+    "machine": {
+      "os": "Darwin 27.2.0",
+      "macos": "27.2",
+      "arch": "arm64",
+      "cpu": "Apple M1 Max",
+      "memory_gb": 64,
+      "python": "3.12.13",
+      "nvidia_gpu": false
+    },
+    "transport": "none: ReplayInput pushes WAV frames at real time, NullOutput drops audio at real time",
+    "concurrency": "one session at a time",
+    "startup": "a fresh pipeline per session; Ollama already running with the model pulled; the first turn of each session is kept",
+    "where_things_ran": {
+      "stt": "faster-whisper on CPU (device=cpu, compute_type=int8)",
+      "llm": "Ollama on this Mac (Ollama uses Apple Metal when available; see loaded_models.size_vram)",
+      "tts": "kokoro-onnx via onnxruntime (CPU execution provider)",
+      "vad": "Silero VAD (onnxruntime, CPU)"
+    }
+  },
+  "config": {
+    "stt": "WhisperSTTService, faster-whisper 1.2.1, model base",
+    "llm": "OpenAILLMService -> http://127.0.0.1:11434/v1, model qwen2.5:3b, temperature 0, max_tokens 60",
+    "tts": "KokoroTTSService, kokoro-onnx 0.6.1, voice af_heart",
+    "vad_stop_secs": 0.2,
+    "turn_stop_strategy": "Pipecat default: TurnAnalyzerUserTurnStopStrategy(LocalSmartTurnAnalyzerV3), local ONNX model",
+    "whisper_model_snapshot": "Systran/faster-whisper-base@ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+    "onnxruntime": "1.31.1",
+    "ollama": {
+      "ollama_version": "0.40.13",
+      "model": "qwen2.5:3b",
+      "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+      "size_bytes": 1929912432,
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "qwen2",
+        "families": [
+          "qwen2"
+        ],
+        "parameter_size": "3.1B",
+        "quantization_level": "Q4_K_M"
+      },
+      "loaded_models": [
+        {
+          "name": "qwen2.5:3b",
+          "size_vram": 3367868825,
+          "size": 3367868825
+        }
+      ]
+    }
+  },
+  "expected_turns": [
+    {
+      "session_id": "c01",
+      "turns": [
+        "u1",
+        "u2",
+        "u3",
+        "u4"
+      ]
+    },
+    {
+      "session_id": "c02",
+      "turns": [
+        "u1",
+        "u2",
+        "u3",
+        "u4"
+      ]
+    },
+    {
+      "session_id": "c03",
+      "turns": [
+        "u1",
+        "u2",
+        "u3",
+        "u4"
+      ]
+    }
+  ],
+  "injected_change": null,
+  "driver_log": [
+    {
+      "session_id": "c01",
+      "event": "pipeline_ready",
+      "secs_after_start": 0.007
+    },
+    {
+      "session_id": "c01",
+      "turn_id": "u1",
+      "event": "bot_finished",
+      "wall_secs": 10.366
+    },
+    {
+      "session_id": "c01",
+      "turn_id": "u2",
+      "event": "bot_finished",
+      "wall_secs": 12.33
+    },
+    {
+      "session_id": "c01",
+      "turn_id": "u3",
+      "event": "bot_finished",
+      "wall_secs": 9.844
+    },
+    {
+      "session_id": "c01",
+      "turn_id": "u4",
+      "event": "bot_finished",
+      "wall_secs": 15.445
+    },
+    {
+      "session_id": "c01",
+      "event": "conversation",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hi, I'm calling about the quote you sent me last week."
+        },
+        {
+          "role": "assistant",
+          "content": "Sure thing, I'll have our estimator get back to you with a follow up."
+        },
+        {
+          "role": "user",
+          "content": "Can you tell me if the price includes installation?"
+        },
+        {
+          "role": "assistant",
+          "content": "The quote I sent didn't specify if installation was included, I'll check and get back to you."
+        },
+        {
+          "role": "user",
+          "content": "and how soon could someone come out to the house?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'll check our schedule and get back to you with an available date."
+        },
+        {
+          "role": "user",
+          "content": "Great thanks, that is all I needed."
+        }
+      ]
+    },
+    {
+      "session_id": "c02",
+      "event": "pipeline_ready",
+      "secs_after_start": 0.005
+    },
+    {
+      "session_id": "c02",
+      "turn_id": "u1",
+      "event": "bot_finished",
+      "wall_secs": 17.627
+    },
+    {
+      "session_id": "c02",
+      "turn_id": "u2",
+      "event": "bot_finished",
+      "wall_secs": 21.388
+    },
+    {
+      "session_id": "c02",
+      "turn_id": "u3",
+      "event": "bot_finished",
+      "wall_secs": 16.203
+    },
+    {
+      "session_id": "c02",
+      "turn_id": "u4",
+      "event": "bot_finished",
+      "wall_secs": 11.818
+    },
+    {
+      "session_id": "c02",
+      "event": "conversation",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hi, I'm calling about the quote you sent me last week."
+        },
+        {
+          "role": "assistant",
+          "content": "Sure thing, I'll have our estimator get back to you with a follow up."
+        },
+        {
+          "role": "user",
+          "content": "Can you tell me if the price includes installation?"
+        },
+        {
+          "role": "assistant",
+          "content": "The quote I sent didn't specify if installation was included, I'll check and get back to you."
+        },
+        {
+          "role": "user",
+          "content": "and how soon could someone come out to the house?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'll check our schedule and get back to you with an available date."
+        },
+        {
+          "role": "user",
+          "content": "Great thanks. That is all I needed."
+        }
+      ]
+    },
+    {
+      "session_id": "c03",
+      "event": "pipeline_ready",
+      "secs_after_start": 0.006
+    },
+    {
+      "session_id": "c03",
+      "turn_id": "u1",
+      "event": "bot_finished",
+      "wall_secs": 25.576
+    },
+    {
+      "session_id": "c03",
+      "turn_id": "u2",
+      "event": "bot_finished",
+      "wall_secs": 25.385
+    },
+    {
+      "session_id": "c03",
+      "turn_id": "u3",
+      "event": "bot_finished",
+      "wall_secs": 18.377
+    },
+    {
+      "session_id": "c03",
+      "turn_id": "u4",
+      "event": "bot_finished",
+      "wall_secs": 14.83
+    },
+    {
+      "session_id": "c03",
+      "event": "conversation",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hi, I'm calling about the quote you sent me last week."
+        },
+        {
+          "role": "assistant",
+          "content": "Sure thing, I'll have our estimator get back to you with a follow up."
+        },
+        {
+          "role": "user",
+          "content": "Can you tell me if the price includes installation?"
+        },
+        {
+          "role": "assistant",
+          "content": "The quote I sent didn't specify if installation was included, I'll check and get back to you."
+        },
+        {
+          "role": "user",
+          "content": "and how soon could someone come out to the house."
+        },
+        {
+          "role": "assistant",
+          "content": "I'll check our schedule and get back to you with an available date."
+        },
+        {
+          "role": "user",
+          "content": "Great thanks. That is all I needed."
+        }
+      ]
+    }
+  ]
+}

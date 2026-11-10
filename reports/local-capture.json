@@ -1,0 +1,552 @@
+{
+ "tool": "voice-check",
+ "tool_version": "0.1.0",
+ "report_schema": 1,
+ "unit": "ms",
+ "units_note": "Pipecat reports seconds as floats; converted to ms here only.",
+ "command": "summarize",
+ "verdict": null,
+ "exit_code": 0,
+ "label": "Run summarized",
+ "min_measured_turns": 300,
+ "scope": {
+  "measures": [
+   {
+    "name": "turn total (LatencyBreakdown.total_secs)",
+    "start_event": "user fell silent, as Pipecat estimates it: VADUserStoppedSpeakingFrame.timestamp minus the VAD stop_secs",
+    "end_event": "BotStartedSpeakingFrame seen in the bot's pipeline",
+    "scope": "SDK-observed"
+   },
+   {
+    "name": "contributions (LatencyBreakdown.contributions)",
+    "start_event": "the Pipecat moment that opens each span (for example LLMFullResponseStartFrame for LLM inference)",
+    "end_event": "the Pipecat moment that closes it (for example the LLM's first chunk, worked back from its TTFB)",
+    "scope": "SDK-observed"
+   }
+  ],
+  "not_measured": [
+   "audio travelling from the bot to the caller, buffering and playback on the caller's device (client-side)",
+   "barge-in stop latency (no reliable Pipecat metric)"
+  ]
+ },
+ "run": {
+  "path": "capture/out/local-capture.jsonl",
+  "manifest": "capture/out/local-capture.manifest.json",
+  "run_id": "local-capture-20261110T112711",
+  "config_id": "whisper-base-cpu+ollama-qwen2.5:3b+kokoro",
+  "scenario_id": "local-4-utterances-v1",
+  "provenance": "local-capture",
+  "inference_backend": "ollama",
+  "framework": "pipecat-ai",
+  "framework_version": "1.15.0",
+  "conditions": {
+   "machine": {
+    "os": "Darwin 27.2.0",
+    "macos": "27.2",
+    "arch": "arm64",
+    "cpu": "Apple M1 Max",
+    "memory_gb": 64,
+    "python": "3.12.13",
+    "nvidia_gpu": false
+   },
+   "transport": "none: ReplayInput pushes WAV frames at real time, NullOutput drops audio at real time",
+   "concurrency": "one session at a time",
+   "startup": "a fresh pipeline per session; Ollama already running with the model pulled; the first turn of each session is kept",
+   "where_things_ran": {
+    "stt": "faster-whisper on CPU (device=cpu, compute_type=int8)",
+    "llm": "Ollama on this Mac (Ollama uses Apple Metal when available; see loaded_models.size_vram)",
+    "tts": "kokoro-onnx via onnxruntime (CPU execution provider)",
+    "vad": "Silero VAD (onnxruntime, CPU)"
+   }
+  },
+  "config": {
+   "stt": "WhisperSTTService, faster-whisper 1.2.1, model base",
+   "llm": "OpenAILLMService -> http://127.0.0.1:11434/v1, model qwen2.5:3b, temperature 0, max_tokens 60",
+   "tts": "KokoroTTSService, kokoro-onnx 0.6.1, voice af_heart",
+   "vad_stop_secs": 0.2,
+   "turn_stop_strategy": "Pipecat default: TurnAnalyzerUserTurnStopStrategy(LocalSmartTurnAnalyzerV3), local ONNX model",
+   "whisper_model_snapshot": "Systran/faster-whisper-base@ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+   "onnxruntime": "1.31.1",
+   "ollama": {
+    "ollama_version": "0.40.13",
+    "model": "qwen2.5:3b",
+    "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "size_bytes": 1929912432,
+    "details": {
+     "parent_model": "",
+     "format": "gguf",
+     "family": "qwen2",
+     "families": [
+      "qwen2"
+     ],
+     "parameter_size": "3.1B",
+     "quantization_level": "Q4_K_M"
+    },
+    "loaded_models": [
+     {
+      "name": "qwen2.5:3b",
+      "size_vram": 3367868825,
+      "size": 3367868825
+     }
+    ]
+   }
+  },
+  "counts": {
+   "sessions_expected": 3,
+   "sessions_observed": 3,
+   "turns_expected": 12,
+   "turns_observed": 12,
+   "turns_measured": 12,
+   "responded_then_interrupted": 0,
+   "failed_no_audio": 0,
+   "failed_no_response": 0,
+   "interrupted_before_response": 0,
+   "missing_from_log": 0,
+   "greetings_kept_apart": 0,
+   "unanchored_breakdowns": 0,
+   "no_audio_errors_in_responded_turns": 8,
+   "duplicate_lines_ignored": 0,
+   "lines_read": 204,
+   "incomplete_turns": 0,
+   "failed_turns": 0
+  },
+  "total": {
+   "n": 12,
+   "median_ms": 7855.812,
+   "median_is_failed_turn": false,
+   "p95_ms": null,
+   "p95_note": "p95 not shown (N = 12)",
+   "min_ms": 3363.186,
+   "max_ms": 16185.934,
+   "mean_ms_measured_only": 9007.917,
+   "n_measured": 12,
+   "n_failed": 0
+  },
+  "greetings": {
+   "note": "Measured from client connected; never mixed with user turns.",
+   "n": 0,
+   "median_ms": null,
+   "p95_ms": null,
+   "p95_note": "p95 not shown (N = 0)"
+  },
+  "contributions": [
+   {
+    "key": "endpointing_wait",
+    "label": "endpointing wait",
+    "owners": [
+     "config: VAD stop_secs"
+    ],
+    "absent_turns": 0,
+    "n": 12,
+    "median_ms": 200.0,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 12)",
+    "min_ms": 200.0,
+    "max_ms": 200.0,
+    "mean_ms_measured_only": 200.0
+   },
+   {
+    "key": "transcription",
+    "label": "transcription",
+    "owners": [
+     "WhisperSTTService#0",
+     "WhisperSTTService#1",
+     "WhisperSTTService#2"
+    ],
+    "absent_turns": 0,
+    "n": 12,
+    "median_ms": 1857.058,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 12)",
+    "min_ms": 532.837,
+    "max_ms": 3966.73,
+    "mean_ms_measured_only": 1883.295
+   },
+   {
+    "key": "turn_detection",
+    "label": "turn detection",
+    "owners": [
+     "config: user turn strategies"
+    ],
+    "absent_turns": 0,
+    "n": 12,
+    "median_ms": 5.601,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 12)",
+    "min_ms": 3.199,
+    "max_ms": 44.265,
+    "mean_ms_measured_only": 9.994
+   },
+   {
+    "key": "llm_inference",
+    "label": "LLM inference",
+    "owners": [
+     "OpenAILLMService#0",
+     "OpenAILLMService#1",
+     "OpenAILLMService#2"
+    ],
+    "absent_turns": 0,
+    "n": 12,
+    "median_ms": 131.126,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 12)",
+    "min_ms": 59.941,
+    "max_ms": 336.329,
+    "mean_ms_measured_only": 169.446
+   },
+   {
+    "key": "speech_synthesis",
+    "label": "speech synthesis",
+    "owners": [
+     "KokoroTTSService#0",
+     "KokoroTTSService#1",
+     "KokoroTTSService#2"
+    ],
+    "absent_turns": 0,
+    "n": 12,
+    "median_ms": 5653.833,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 12)",
+    "min_ms": 1923.283,
+    "max_ms": 12903.189,
+    "mean_ms_measured_only": 6082.458
+   },
+   {
+    "key": "output_transport",
+    "label": "output transport",
+    "owners": [
+     "NullOutput#1",
+     "NullOutput#2"
+    ],
+    "absent_turns": 0,
+    "n": 2,
+    "median_ms": 5.268,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 2)",
+    "min_ms": 5.268,
+    "max_ms": 123.032,
+    "mean_ms_measured_only": 64.15
+   },
+   {
+    "key": "pipeline",
+    "label": "pipeline",
+    "owners": [
+     "pipecat"
+    ],
+    "absent_turns": 0,
+    "n": 10,
+    "median_ms": 2.98,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 10)",
+    "min_ms": 1.411,
+    "max_ms": 4.998,
+    "mean_ms_measured_only": 2.969
+   },
+   {
+    "key": "sentence_aggregation",
+    "label": "sentence aggregation",
+    "owners": [
+     "config: text_aggregation_mode"
+    ],
+    "absent_turns": 0,
+    "n": 12,
+    "median_ms": 323.411,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 12)",
+    "min_ms": 63.855,
+    "max_ms": 3984.598,
+    "mean_ms_measured_only": 649.558
+   }
+  ],
+  "services": [
+   {
+    "processor": "KokoroTTSService",
+    "model": "model not reported",
+    "metric": "ttfb",
+    "source": "LatencyBreakdown.ttfb, first per turn",
+    "n": 12,
+    "median_ms": 5647.768,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 12)",
+    "min_ms": 1918.283,
+    "max_ms": 12892.011,
+    "mean_ms_measured_only": 6071.619
+   },
+   {
+    "processor": "OpenAILLMService",
+    "model": "qwen2.5:3b",
+    "metric": "ttfb",
+    "source": "LatencyBreakdown.ttfb, first per turn",
+    "n": 12,
+    "median_ms": 148.795,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 12)",
+    "min_ms": 60.306,
+    "max_ms": 334.648,
+    "mean_ms_measured_only": 171.251
+   },
+   {
+    "processor": "WhisperSTTService",
+    "model": "base",
+    "metric": "ttfb",
+    "source": "LatencyBreakdown.ttfb, first per turn",
+    "n": 7,
+    "median_ms": 1208.505,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 7)",
+    "min_ms": 732.145,
+    "max_ms": 2066.982,
+    "mean_ms_measured_only": 1414.89
+   },
+   {
+    "processor": "KokoroTTSService",
+    "metric": "ttfa",
+    "note": "TTFA = TTFB + leading_silence; its ttfb field copies the TTFB above and is not counted again",
+    "n": 12,
+    "median_ms": 5696.768,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 12)",
+    "min_ms": 1952.283,
+    "max_ms": 13029.011,
+    "mean_ms_measured_only": 6135.619,
+    "leading_silence": {
+     "n": 12,
+     "median_ms": 36.0,
+     "median_is_failed_turn": false,
+     "p95_ms": null,
+     "p95_note": "p95 not shown (N = 12)",
+     "min_ms": 34.0,
+     "max_ms": 137.0,
+     "mean_ms_measured_only": 64.0
+    }
+   },
+   {
+    "processor": "OpenAILLMService",
+    "metric": "ttfat",
+    "note": "TTFAT = TTFB + thinking_time; its ttfb field copies the TTFB above and is not counted again",
+    "n": 12,
+    "median_ms": 149.013,
+    "median_is_failed_turn": false,
+    "p95_ms": null,
+    "p95_note": "p95 not shown (N = 12)",
+    "min_ms": 60.52,
+    "max_ms": 334.833,
+    "mean_ms_measured_only": 171.829,
+    "thinking_time": {
+     "n": 12,
+     "median_ms": 0.218,
+     "median_is_failed_turn": false,
+     "p95_ms": null,
+     "p95_note": "p95 not shown (N = 12)",
+     "min_ms": 0.185,
+     "max_ms": 2.379,
+     "mean_ms_measured_only": 0.577
+    }
+   }
+  ],
+  "llm_usage_metrics_present": true,
+  "zero_and_missing": {
+   "initialization": 9,
+   "zero_value": 0,
+   "absent": 0,
+   "not_applicable": 12
+  },
+  "input_errors": [],
+  "input_error_count": 0
+ },
+ "turn_table": [
+  {
+   "session_id": "c01",
+   "turn_id": "u1",
+   "status": "responded",
+   "total_ms": 3637.483,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 749.561,
+    "turn_detection": 44.265,
+    "llm_inference": 112.513,
+    "sentence_aggregation": 389.377,
+    "speech_synthesis": 2138.495,
+    "pipeline": 3.272
+   }
+  },
+  {
+   "session_id": "c01",
+   "turn_id": "u2",
+   "status": "responded",
+   "total_ms": 4078.126,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 532.837,
+    "turn_detection": 5.601,
+    "llm_inference": 147.137,
+    "sentence_aggregation": 609.007,
+    "speech_synthesis": 2581.247,
+    "pipeline": 2.297
+   }
+  },
+  {
+   "session_id": "c01",
+   "turn_id": "u3",
+   "status": "responded",
+   "total_ms": 3363.186,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 696.152,
+    "turn_detection": 6.735,
+    "llm_inference": 166.277,
+    "sentence_aggregation": 367.129,
+    "speech_synthesis": 1923.283,
+    "pipeline": 3.61
+   }
+  },
+  {
+   "session_id": "c01",
+   "turn_id": "u4",
+   "status": "responded",
+   "total_ms": 7855.812,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 1800.339,
+    "turn_detection": 7.446,
+    "llm_inference": 128.439,
+    "sentence_aggregation": 63.855,
+    "speech_synthesis": 5653.833,
+    "pipeline": 1.9
+   }
+  },
+  {
+   "session_id": "c02",
+   "turn_id": "u1",
+   "status": "responded",
+   "total_ms": 10453.063,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 1009.174,
+    "turn_detection": 3.199,
+    "llm_inference": 59.941,
+    "sentence_aggregation": 251.915,
+    "speech_synthesis": 8805.802,
+    "output_transport": 123.032
+   }
+  },
+  {
+   "session_id": "c02",
+   "turn_id": "u2",
+   "status": "responded",
+   "total_ms": 12741.717,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 1857.058,
+    "turn_detection": 3.461,
+    "llm_inference": 336.329,
+    "sentence_aggregation": 323.411,
+    "speech_synthesis": 10017.913,
+    "pipeline": 3.545
+   }
+  },
+  {
+   "session_id": "c02",
+   "turn_id": "u3",
+   "status": "responded",
+   "total_ms": 9466.895,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 2530.417,
+    "turn_detection": 5.358,
+    "llm_inference": 296.401,
+    "sentence_aggregation": 332.466,
+    "speech_synthesis": 6099.273,
+    "pipeline": 2.98
+   }
+  },
+  {
+   "session_id": "c02",
+   "turn_id": "u4",
+   "status": "responded",
+   "total_ms": 5926.282,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 2859.089,
+    "turn_detection": 16.289,
+    "llm_inference": 131.126,
+    "sentence_aggregation": 126.141,
+    "speech_synthesis": 2590.347,
+    "pipeline": 3.29
+   }
+  },
+  {
+   "session_id": "c03",
+   "turn_id": "u1",
+   "status": "responded",
+   "total_ms": 16177.38,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 3966.73,
+    "turn_detection": 11.461,
+    "llm_inference": 74.813,
+    "sentence_aggregation": 3984.598,
+    "speech_synthesis": 7938.367,
+    "pipeline": 1.411
+   }
+  },
+  {
+   "session_id": "c03",
+   "turn_id": "u2",
+   "status": "responded",
+   "total_ms": 16185.934,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 1867.623,
+    "turn_detection": 3.461,
+    "llm_inference": 157.205,
+    "sentence_aggregation": 1052.069,
+    "speech_synthesis": 12903.189,
+    "pipeline": 2.387
+   }
+  },
+  {
+   "session_id": "c03",
+   "turn_id": "u3",
+   "status": "responded",
+   "total_ms": 11970.518,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 2514.345,
+    "turn_detection": 7.389,
+    "llm_inference": 332.849,
+    "sentence_aggregation": 213.638,
+    "speech_synthesis": 8697.299,
+    "pipeline": 4.998
+   }
+  },
+  {
+   "session_id": "c03",
+   "turn_id": "u4",
+   "status": "responded",
+   "total_ms": 6238.613,
+   "contributions_ms": {
+    "endpointing_wait": 200.0,
+    "transcription": 2216.217,
+    "turn_detection": 5.265,
+    "llm_inference": 90.327,
+    "sentence_aggregation": 81.092,
+    "speech_synthesis": 3640.444,
+    "output_transport": 5.268
+   }
+  }
+ ],
+ "greeting_table": []
+}
