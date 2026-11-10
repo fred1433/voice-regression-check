@@ -319,7 +319,7 @@ dialog::backdrop{background:rgba(24,36,44,.42)}
   <h1>A voice regression hidden by an unchanged median</h1>
   <div class="lead">
     <span class="synth">Synthetic example</span>
-    <p>The same 200 scripted calls through a Pipecat pipeline, with the baseline configuration and with a candidate. The median turn stays at {{C_MED}}. A hundred turns got slower, and the check says which.</p>
+    <p>The same 200 scripted calls, timed by Pipecat's own latency observer, once with a baseline configuration and once with a candidate. The median turn stays at {{C_MED}}. A hundred turns got slower, and the check says which.</p>
   </div>
 
   <div class="verdict">
@@ -415,9 +415,9 @@ uv sync
     <div class="codes">
       <span><code>0</code>Latency policy passed</span>
       <span><code>1</code>FAIL: configured latency threshold exceeded</span>
-      <span><code>2</code>INCOMPLETE: input error, missing turns, too few turns, or no policy</span>
+      <span><code>2</code>INCOMPLETE: input error, runs not comparable, missing turns, too few turns, or no policy</span>
     </div>
-    <p class="small muted" style="margin:0">Log analysis runs offline: the command reads two JSONL files and a policy, and downloads nothing. The terminal output and this page are both generated from report.json. To use it on your own runs, add <code>capture/pipecat_jsonl_observer.py</code> to a Pipecat pipeline: it writes one envelope line per Pipecat event.</p>
+    <p class="small muted" style="margin:0">Log analysis runs offline: the command reads two JSONL logs, their manifests and a policy, and downloads nothing. The terminal output and this page are both generated from report.json. To use it on your own runs, add <code>capture/pipecat_jsonl_observer.py</code> to a Pipecat pipeline: it writes one envelope line per Pipecat event.</p>
     <details id="output"><summary>Terminal output of that command</summary><pre>{{TERMINAL}}</pre></details>
   </div>
 </section>
