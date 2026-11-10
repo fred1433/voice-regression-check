@@ -470,7 +470,7 @@ dialog::backdrop{background:rgba(24,36,44,.42)}
           <p>VAD stop_secs {{CAP_VAD}}; turn stop: {{CAP_TURN}}.</p>
           <p>Transport: {{CAP_TRANSPORT}}. Startup: {{CAP_STARTUP}}.</p>
           <p>{{CAP_NOAUDIO}} "completed with no audio" errors came from Kokoro in turns that still got a spoken reply; they are kept in the log and counted.</p>
-          <p>Raw log, manifest, input audio and script: <a href="{{REPO}}/tree/main/capture">capture/ in the repository</a>.</p>
+          <p>Raw log, manifest, input audio and script: <a href="{{REPO}}/tree/master/capture">capture/ in the repository</a>.</p>
         </div>
       </details>
     </div>
