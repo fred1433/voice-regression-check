@@ -1,7 +1,8 @@
 """voice-check: compare two runs of the same voice scenarios, offline.
 
 Exit codes for ``compare``: 0 PASS, 1 FAIL, 2 INCOMPLETE (including an input
-error, a missing policy or a bad argument).
+error, a missing policy, a bad argument, or a file that cannot be read or
+written). 1 means FAIL and nothing else: no error ever exits 1.
 """
 
 from __future__ import annotations
@@ -59,9 +60,17 @@ def cmd_summarize(a) -> int:
 def cmd_show(a) -> int:
     p = Path(a.report)
     if not p.exists():
-        print(f"report not found: {p}", file=sys.stderr)
+        print(f"INCOMPLETE: input error: report not found: {p}", file=sys.stderr)
         return EXIT_INCOMPLETE
-    report = json.loads(p.read_text())
+    try:
+        report = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"INCOMPLETE: input error: {p} is not JSON: {exc}", file=sys.stderr)
+        return EXIT_INCOMPLETE
+    if not (isinstance(report, dict) and report.get("tool") == "voice-check"
+            and report.get("command") in ("compare", "summarize") and report.get("exit_code") in (0, 1, 2)):
+        print(f"INCOMPLETE: input error: {p} is not a voice-check report", file=sys.stderr)
+        return EXIT_INCOMPLETE
     print(render(report))
     return report["exit_code"]
 
@@ -99,7 +108,13 @@ def main(argv: list[str] | None = None) -> int:
     w.set_defaults(func=cmd_show)
 
     a = ap.parse_args(argv)
-    return a.func(a)
+    try:
+        return a.func(a)
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError) as exc:
+        # a file that cannot be read or written, or a report of the wrong
+        # shape: never exit 1, which means FAIL
+        print(f"INCOMPLETE: input error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return EXIT_INCOMPLETE
 
 
 if __name__ == "__main__":

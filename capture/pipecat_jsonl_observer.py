@@ -14,8 +14,12 @@ wraps one native Pipecat object, left as Pipecat serializes it:
   1296). Its ``processor`` and ``exception`` fields are live objects, so the
   line keeps ``error``, ``fatal``, ``category`` and the processor's name.
 
-Turn ids come from the scenario driver (``begin_turn``), not from the VAD, so
-two configurations replaying the same scenario produce comparable turn ids.
+Turn ids come from the scenario driver, not from the VAD, so two
+configurations replaying the same scenario produce comparable turn ids. The
+driver must call ``begin_session()`` before the pipeline starts (the first
+MetricsFrame raises otherwise) and ``begin_turn()`` when each user turn starts,
+after the pipeline is up and any greeting has played; without ``begin_turn()``
+no turn is measured.
 Lines are buffered per turn and written when the turn closes, so every line of
 a turn carries the turn's final status.
 """
@@ -33,7 +37,9 @@ from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     ErrorFrame,
     InterruptionFrame,
+    LLMFullResponseStartFrame,
     MetricsFrame,
+    TTSStartedFrame,
 )
 from pipecat.observers.base_observer import BaseObserver, FramePushed
 from pipecat.observers.user_bot_latency_observer import LatencyBreakdown, UserBotLatencyObserver
@@ -85,6 +91,7 @@ class EnvelopeWriter:
         self._turn_id: str | None = None
         self._turn_events: list[dict[str, Any]] = []
         self._interrupted = False
+        self._response_open = False  # a reply to this turn started and has not finished playing
 
     # -- session and turn boundaries ------------------------------------------------
 
@@ -98,6 +105,7 @@ class EnvelopeWriter:
         self._turn_id = turn_id
         self._turn_events = []
         self._interrupted = False
+        self._response_open = False
 
     def end_turn(self) -> None:
         if self._turn_id is None:
@@ -139,11 +147,24 @@ class EnvelopeWriter:
         }
         self._add("error", type(frame).__name__, payload)
 
+    def response_started(self) -> None:
+        """A reply to the current turn is under way (LLM or TTS started, or audio)."""
+        if self._turn_id is not None:
+            self._response_open = True
+
+    def response_finished(self) -> None:
+        self._response_open = False
+
+    @property
+    def response_open(self) -> bool:
+        return self._response_open
+
     def add_interruption(self) -> None:
         # Kept as the turn's status only: an InterruptionFrame says that the
         # user cut in, not when the bot's audio stopped.
         if self._turn_id is not None:
             self._interrupted = True
+            self._response_open = False
 
     # -- internals ---------------------------------------------------------------------
 
@@ -225,11 +246,17 @@ class PipecatJsonlObserver(BaseObserver):
             self.writer.add_metrics_frame(frame)
         elif isinstance(frame, ErrorFrame):
             self.writer.add_error_frame(frame)
+        elif isinstance(frame, (LLMFullResponseStartFrame, TTSStartedFrame)):
+            self.writer.response_started()
         elif isinstance(frame, BotStartedSpeakingFrame):
             self._bot_speaking = True
+            self.writer.response_started()
         elif isinstance(frame, BotStoppedSpeakingFrame):
             self._bot_speaking = False
-        elif isinstance(frame, InterruptionFrame) and self._bot_speaking:
-            # Only an interruption of bot audio counts; Pipecat can also push
-            # an InterruptionFrame when nothing is playing.
+            self.writer.response_finished()
+        elif isinstance(frame, InterruptionFrame) and (self._bot_speaking or self.writer.response_open):
+            # An interruption counts when it cuts a reply: one already playing,
+            # or one engaged (LLM or TTS started) before its first audio, which
+            # Pipecat cancels as well. Pipecat can also push an InterruptionFrame
+            # when no reply is under way; that one is ignored.
             self.writer.add_interruption()

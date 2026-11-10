@@ -42,27 +42,52 @@ def nearest_rank(sorted_values: list, pct: int):
     return sorted_values[max(rank, 1) - 1]
 
 
+FAILED_P95 = "p95 falls on a failed turn"
+FAILED_MEDIAN = "median falls on a failed turn"
+STATISTICS = {
+    "median": "middle value; the mean of the two middle values when N is even",
+    "p95": "nearest rank: the value at rank ceil(0.95 x N)",
+    "n": "N counts measured turns plus failed turns (a failed turn sorts above every measured value)",
+}
+
+
+def median(sorted_values: list):
+    n = len(sorted_values)
+    if n % 2:
+        return sorted_values[n // 2]
+    a, b = sorted_values[n // 2 - 1], sorted_values[n // 2]
+    return INF if INF in (a, b) else (a + b) / 2
+
+
 def distribution(values_us: list, min_n: int) -> dict:
     """Median and p95 with their N. ``inf`` stands for a failed turn: it stays
-    in the denominator and sorts above every measured value."""
+    in the denominator and sorts above every measured value. The p95 is shown
+    only when at least ``min_n`` turns were actually measured."""
     vals = sorted(values_us)
     n = len(vals)
+    finite = [v for v in vals if v != INF]
     out: dict[str, Any] = {"n": n}
     if n == 0:
         out.update(median_ms=None, p95_ms=None, p95_note="p95 not shown (N = 0)")
         return out
-    med = nearest_rank(vals, 50)
+    med = median(vals)
     out["median_ms"] = us_to_ms(med)
     out["median_is_failed_turn"] = med == INF
-    if n < min_n:
+    if med == INF:
+        out["median_note"] = FAILED_MEDIAN
+    if len(finite) < min_n:
         out["p95_ms"] = None
-        out["p95_note"] = f"p95 not shown (N = {n})"
+        out["p95_note"] = (
+            f"p95 not shown (N = {n:,})" if len(finite) == n
+            else f"p95 not shown ({len(finite):,} measured turns, N = {n:,})"
+        )
     else:
         p95 = nearest_rank(vals, 95)
         out["p95_ms"] = us_to_ms(p95)
         out["p95_is_failed_turn"] = p95 == INF
+        if p95 == INF:
+            out["p95_note"] = FAILED_P95
         out["_p95_us"] = p95
-    finite = [v for v in vals if v != INF]
     out["min_ms"] = us_to_ms(finite[0]) if finite else None
     out["max_ms"] = us_to_ms(finite[-1]) if finite else None
     out["mean_ms_measured_only"] = us_to_ms(sum(finite) / len(finite)) if finite else None
@@ -275,6 +300,8 @@ def summarize(run: Run, *, min_n: int, threshold_ms: float | None = None) -> dic
         if not t:
             continue
         seen_proc = set()
+        seen_ttfa: set[str] = set()
+        seen_ttfat: set[str] = set()
         if t.breakdown:
             for item in t.breakdown["ttfb"]:
                 if item["processor"] in seen_proc:
@@ -286,10 +313,14 @@ def summarize(run: Run, *, min_n: int, threshold_ms: float | None = None) -> dic
             if nt == "TTFBMetricsData" and not t.breakdown and p["processor"] not in seen_proc:
                 seen_proc.add(p["processor"])
                 ttfb[(_service(p["processor"]), _model_label(p["model"]))].append(to_us(p["value"]))
-            elif nt == "TTFAMetricsData":
+            elif nt == "TTFAMetricsData" and p["processor"] not in seen_ttfa:
+                # first per processor and turn, like the TTFB: a TTS speaking
+                # three sentences reports three TTFAs for one turn
+                seen_ttfa.add(p["processor"])
                 ttfa[_service(p["processor"])]["ttfa"].append(to_us(p["ttfa"]))
                 ttfa[_service(p["processor"])]["leading_silence"].append(to_us(p["leading_silence"]))
-            elif nt == "TTFATMetricsData":
+            elif nt == "TTFATMetricsData" and p["processor"] not in seen_ttfat:
+                seen_ttfat.add(p["processor"])
                 ttfat[_service(p["processor"])]["ttfat"].append(to_us(p["ttfat"]))
                 ttfat[_service(p["processor"])]["thinking_time"].append(to_us(p["thinking_time"]))
             elif nt == "LLMUsageMetricsData":
@@ -308,6 +339,7 @@ def summarize(run: Run, *, min_n: int, threshold_ms: float | None = None) -> dic
             {
                 "processor": proc,
                 "metric": "ttfa",
+                "source": "TTFAMetricsData, first per processor and turn",
                 "note": "TTFA = TTFB + leading_silence; its ttfb field copies the TTFB above and is not counted again",
                 **_clean(distribution(parts["ttfa"], min_n)),
                 "leading_silence": _clean(distribution(parts["leading_silence"], min_n)),
@@ -318,6 +350,7 @@ def summarize(run: Run, *, min_n: int, threshold_ms: float | None = None) -> dic
             {
                 "processor": proc,
                 "metric": "ttfat",
+                "source": "TTFATMetricsData, first per processor and turn",
                 "note": "TTFAT = TTFB + thinking_time; its ttfb field copies the TTFB above and is not counted again",
                 **_clean(distribution(parts["ttfat"], min_n)),
                 "thinking_time": _clean(distribution(parts["thinking_time"], min_n)),
@@ -420,9 +453,10 @@ def _attribution(base: Run, cand: Run, threshold_ms: float, cand_manifest: dict 
         if ct.breakdown and bt and bt.breakdown:
             cb, bb = _contrib_by_key(ct.breakdown), _contrib_by_key(bt.breakdown)
             row["contribution_delta_ms"] = {
+                # a stage absent on one side counts as 0 there, so a stage that
+                # appears only in the candidate (a tool call, say) is not lost
                 key: us_to_ms(to_us(cb.get(key, {}).get("secs", 0.0)) - to_us(bb.get(key, {}).get("secs", 0.0)))
                 for key in sorted(set(cb) | set(bb))
-                if key in cb and key in bb
             }
             row["trace"] = {
                 "baseline": _trace(bt.breakdown),
@@ -431,7 +465,7 @@ def _attribution(base: Run, cand: Run, threshold_ms: float, cand_manifest: dict 
         affected.append(row)
     affected.sort(key=lambda r: (-(r["delta_ms"] or 0), r["session_id"], r["turn_id"]))
 
-    paired = [r for r in affected if r.get("contribution_delta_ms")]
+    paired = [r for r in affected if "contribution_delta_ms" in r]
     total_delta = sum(r["delta_ms"] for r in paired if r["delta_ms"] and r["delta_ms"] > 0)
     by_key: dict[str, float] = defaultdict(float)
     for r in paired:
@@ -446,10 +480,15 @@ def _attribution(base: Run, cand: Run, threshold_ms: float, cand_manifest: dict 
     primary = changed[0]["contribution_key"] if changed and changed[0]["share_of_total_delta"] >= 0.5 else None
     associated = []
     if primary:
-        owners = set()
+        # a metric is listed only if the candidate's own events carry it for
+        # that owner; the owner of a span is not assumed to have a TTFB
+        owners, with_ttfb = set(), set()
         for r in paired:
-            owners |= {c["owner"] for c in cand.turns[(r["session_id"], r["turn_id"])].breakdown["contributions"] if c["key"] == primary}
-        for owner in sorted(owners):
+            t = cand.turns[(r["session_id"], r["turn_id"])]
+            owners |= {c["owner"] for c in t.breakdown["contributions"] if c["key"] == primary}
+            with_ttfb |= {i["processor"] for i in t.breakdown["ttfb"]}
+            with_ttfb |= {l["payload"]["processor"] for l in t.metrics if l["native_type"] == "TTFBMetricsData"}
+        for owner in sorted(owners & with_ttfb):
             associated.append({"metric": "ttfb", "processor": owner})
 
     sessions_hit = sorted({r["session_id"] for r in affected})
@@ -501,7 +540,9 @@ def _trace(breakdown: dict) -> list[dict]:
     contribs = breakdown["contributions"]
     if not contribs:
         return []
-    t0 = breakdown["user_turn_start_time"] or contribs[0]["start_time"]
+    t0 = breakdown["user_turn_start_time"]
+    if t0 is None:
+        t0 = contribs[0]["start_time"]
     return [
         {
             "key": c["key"],
@@ -572,8 +613,11 @@ def compare(base: Run, cand: Run, policy: dict) -> dict:
                         ),
                     }
                 )
-            elif s["total"]["n"] < min_n:
-                reasons.append({"code": "too_few_turns", "run": name, "detail": f"N = {s['total']['n']}, the policy asks for {min_n}"})
+            elif s["counts"]["turns_measured"] < min_n:
+                m, n = s["counts"]["turns_measured"], s["total"]["n"]
+                extra = f" (N = {n:,} with failed turns)" if n != m else ""
+                reasons.append({"code": "too_few_turns", "run": name,
+                                "detail": f"{m:,} measured turns{extra}; the policy asks for {min_n:,} measured turns"})
 
     thr_us = round(thr_ms * 1000)
     evaluation = None
@@ -591,12 +635,14 @@ def compare(base: Run, cand: Run, policy: dict) -> dict:
             "statistic": "p95",
             "value_ms": us_to_ms(p95_us),
             "value_is_failed_turn": p95_us == INF,
+            **({"value_note": FAILED_P95} if p95_us == INF else {}),
             "n": sc["total"]["n"],
             "operator": "<=",
             "threshold_ms": thr_ms,
             "compared_at": "microsecond",
             "passed": passed,
             "baseline_value_ms": us_to_ms(sb["total"]["_p95_us"]),
+            **({"baseline_value_note": FAILED_P95} if sb["total"]["_p95_us"] == INF else {}),
             "baseline_passed": sb["total"]["_p95_us"] <= thr_us,
         }
     for s in (sb, sc):
@@ -619,6 +665,7 @@ def compare(base: Run, cand: Run, policy: dict) -> dict:
         "report_schema": REPORT_SCHEMA,
         "unit": "ms",
         "units_note": "Pipecat reports seconds as floats; converted to ms here only, compared at the microsecond.",
+        "statistics": STATISTICS,
         "command": "compare",
         "verdict": verdict,
         "exit_code": code,
@@ -645,6 +692,7 @@ def single(run: Run, *, min_n: int) -> dict:
         "report_schema": REPORT_SCHEMA,
         "unit": "ms",
         "units_note": "Pipecat reports seconds as floats; converted to ms here only.",
+        "statistics": STATISTICS,
         "command": "summarize",
         "verdict": None,
         "exit_code": 0 if ok else 2,

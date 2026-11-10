@@ -4,6 +4,11 @@
  "report_schema": 1,
  "unit": "ms",
  "units_note": "Pipecat reports seconds as floats; converted to ms here only, compared at the microsecond.",
+ "statistics": {
+  "median": "middle value; the mean of the two middle values when N is even",
+  "p95": "nearest rank: the value at rank ceil(0.95 x N)",
+  "n": "N counts measured turns plus failed turns (a failed turn sorts above every measured value)"
+ },
  "command": "compare",
  "verdict": "INCOMPLETE",
  "exit_code": 2,
@@ -308,6 +313,7 @@
     {
      "processor": "ScriptedTTS",
      "metric": "ttfa",
+     "source": "TTFAMetricsData, first per processor and turn",
      "note": "TTFA = TTFB + leading_silence; its ttfb field copies the TTFB above and is not counted again",
      "n": 1000,
      "median_ms": 112.0,
@@ -549,6 +555,7 @@
     {
      "processor": "ScriptedTTS",
      "metric": "ttfa",
+     "source": "TTFAMetricsData, first per processor and turn",
      "note": "TTFA = TTFB + leading_silence; its ttfb field copies the TTFB above and is not counted again",
      "n": 900,
      "median_ms": 112.0,

@@ -1,10 +1,16 @@
 # Reproducible voice regression check
 
-Compare two configurations of a Pipecat voice agent on the same scenarios, find
-the turns that got slower, and refuse to conclude when the logs do not allow it.
+Compare two Pipecat runs against an explicit latency policy, inspect the turns
+over budget, and refuse to conclude when the logs do not allow it.
 `voice-check` reads the latency data Pipecat already produces
 (`LatencyBreakdown` and `MetricsFrame`), applies one written policy, and returns
 an exit code a CI step can use.
+
+Where it sits next to `pipecat.evals` (shipped in Pipecat 1.15.0): an eval
+scenario holds a scripted conversation with a bot and can give each expected
+event a `within_ms` budget, measured from the user's send. `voice-check` works
+after the runs: it reads two finished runs' latency logs offline and compares
+their distributions (a p95 over hundreds of turns) under one written policy.
 
 Page: https://theaipipe.com/demos/voice-regression-check/
 
@@ -45,10 +51,11 @@ page are both rendered from `report.json` (`uv run voice-check show report.json`
 |---|---|---|
 | 0 | `PASS` | Latency policy passed |
 | 1 | `FAIL` | FAIL: configured latency threshold exceeded |
-| 2 | `INCOMPLETE` | input error (unknown version or structure, missing manifest, bad arguments, no policy), runs not comparable, expected turns missing or unmeasured, or too few turns for a p95 |
+| 2 | `INCOMPLETE` | input error (unknown version or structure, missing or malformed manifest, a turn listed twice, a negative or non-finite duration, an event id reused with other content, a file that cannot be read or written, bad arguments, no policy), runs not comparable, expected turns missing or unmeasured, or too few measured turns for a p95 |
 
 `PASS` is about latency only. It says nothing about what the agent said.
-There is no default threshold: without `--policy`, `compare` exits 2.
+There is no default threshold: without `--policy`, `compare` exits 2. Exit 1
+means `FAIL` and nothing else: an error never exits 1.
 
 ## The policy
 
@@ -59,8 +66,12 @@ measurement. Applying it at p95 is this demo's choice.
 
 * Rule evaluated: turn total, p95 (nearest rank, `ceil(0.95 × N)`), `<= 420 ms`,
   compared at the microsecond, so a p95 of exactly 420 ms passes and 420.001 ms fails.
-* `min_measured_turns: 300`: below it, no p95 is printed ("p95 not shown (N = x)")
-  and the verdict is `INCOMPLETE`. A floor, not a statistical guarantee.
+* `min_measured_turns: 300`: counted on turns that were actually measured (a
+  failed turn stays in N but does not count toward the floor). Below it, no p95
+  is printed ("p95 not shown (N = x)") and the verdict is `INCOMPLETE`. A floor,
+  not a statistical guarantee.
+* The median is the middle value, or the mean of the two middle values when N
+  is even. It is reported, never evaluated.
 * `max_incomplete_turns: 0`: an expected turn missing from the log, or interrupted
   before any response, makes the verdict `INCOMPLETE`.
 * `published_breakdown`: the post's four lines, copied word for word. Informative,
@@ -86,8 +97,12 @@ How the numbers are built:
 * Greetings (`measured_from: client_connected`) are kept apart from user turns.
 * A turn that ended with "completed with no audio", or with no response at all,
   stays in the denominator as a failed turn and sorts above every measured value.
-* An interruption is kept as the turn's status. The boolean is never read as the
-  time audio stopped.
+  When the p95 rank lands on one, the report says "p95 falls on a failed turn"
+  and the check fails; it never prints an empty value.
+* An interruption is kept as the turn's status. It counts when it cuts a reply
+  already playing, or one already engaged (LLM or TTS started) before its first
+  audio; an `InterruptionFrame` with no reply under way is ignored. It is never
+  read as the time audio stopped.
 * Units: Pipecat reports seconds as floats (checked in 1.15.0). `report.json`
   converts to milliseconds (`"unit": "ms"`); fixtures stay in native seconds.
 * Sessions and turns are counted separately; the report keeps scenario, config,
@@ -98,7 +113,12 @@ How the numbers are built:
 For the turns over the threshold, the report separates four things: the measure
 that changed (the contribution, or the associated metric, that accounts for the
 added time), the turns concerned, hypotheses compatible with the logs, and what
-is missing to decide. It does not name a cause. The only cause ever named is the
+is missing to decide. A stage present on one side only counts as 0 on the other.
+An associated metric is listed only when the candidate's own events carry it for
+that stage's owner.
+
+These are the candidate turns over the policy's threshold, not every turn that
+got slower: a turn going from 300 to 400 ms stays under 420 ms and is not listed. It does not name a cause. The only cause ever named is the
 one declared in a synthetic fixture's manifest, where it is known because it was
 injected. All of this text is fixed templates filled by code; no language model
 writes any of it.
@@ -107,7 +127,13 @@ writes any of it.
 
 Each JSONL line wraps one native Pipecat object, left as Pipecat serializes it.
 `capture/pipecat_jsonl_observer.py` writes it; add it to a pipeline next to a
-`UserBotLatencyObserver`:
+`UserBotLatencyObserver`, and mark sessions and turns from your scenario driver:
+
+* `writer.begin_session(id)` before the pipeline runs: the first `MetricsFrame`
+  raises `RuntimeError` without it;
+* `writer.begin_turn(id)` when each user turn starts, after the pipeline is up and
+  any greeting has played, so startup zeros and the greeting stay outside the
+  turn. Without `begin_turn()`, no turn is measured.
 
 ```python
 # sketch: inside your bot, around your existing pipeline
@@ -122,7 +148,12 @@ jsonl = PipecatJsonlObserver(writer)
 jsonl.attach(latency)
 worker = PipelineWorker(pipeline, params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
                         observers=[latency, jsonl])
-writer.begin_session("call-0001"); writer.begin_turn("u1")   # turn ids come from your scenario
+writer.begin_session("call-0001")      # before the pipeline runs
+# ... start the pipeline, let any greeting play ...
+for turn_id in ("u1", "u2", "u3"):      # turn ids come from your scenario
+    writer.begin_turn(turn_id)         # when the caller's turn starts
+    # ... play the caller's audio, wait for the bot's reply ...
+writer.close()
 ```
 
 Envelope fields: `schema`, `schema_version`, `framework`, `framework_version`,
@@ -137,7 +168,10 @@ written with `model_dump(mode="json")`; `ErrorFrame` is a dataclass whose
 `processor` and `exception` fields are live objects, so the line keeps `error`,
 `fatal`, `category` and the processor's name. A line without the envelope, an
 unknown framework version, event type, native type or key set is an input
-error: it never produces `PASS`. A session imported twice is read once.
+error: it never produces `PASS`. So are a duration that is negative or not a
+finite number, and an `event_id` seen twice with different content. A session
+imported twice (identical lines) is read once; a manifest must list each
+expected turn once.
 
 ## Parser cases, as found in pipecat-ai 1.15.0
 
@@ -180,9 +214,10 @@ runs), and the same envelope writer records what it emits.
 
 * 200 sessions of 5 user turns (1,000 turns) plus one greeting per session.
 * Baseline: 200 turns at each of 380, 390, 400, 410 and 420 ms.
-* Candidate: the LLM's first chunk arrives 500 ms later on every turn of 20
-  sessions (100 turns, 20 at each value). The delay is injected into the events;
-  first text, first audio and bot speaking move with it.
+* Candidate: the simulated LLM's first chunk arrives 500 ms later on every turn
+  of 20 sessions, so 100 turns take 500 ms longer (20 each from 380, 390, 400, 410
+  and 420 ms to 880, 890, 900, 910 and 920 ms). The delay is injected into the
+  events; first text, first audio and bot speaking move with it.
 
 | | Baseline | Candidate |
 |---|---|---|
@@ -214,11 +249,12 @@ M1 Max Mac with 64 GB (macOS 27.2, no NVIDIA GPU), with nothing in the cloud:
 * three sessions, one at a time, each a fresh pipeline; nothing trimmed.
 
 `uv run voice-check summarize capture/out/local-capture.jsonl` gives 12 measured
-turns: median 7.86 s, min 3.36 s, max 16.19 s, and no p95 (N = 12). Kokoro also
+turns: median 8.66 s, min 3.36 s, max 16.19 s, and no p95 (N = 12). Kokoro also
 logged eight "completed with no audio" errors in turns that still got a spoken
-reply. These are laptop numbers: they are nowhere near 420 ms and are not meant
-to be. Totals rose from the first session to the third; this run does not say why.
-Nothing here is presented as equivalent to a production inference server.
+reply. The run checks the capture on a full local pipeline, not its speed: the
+totals are far above 420 ms. They rose from the first session to the third; this
+run does not say why. Nothing here is presented as equivalent to a production
+inference server.
 
 To run it again (models are downloaded on first use, all free and local):
 
@@ -241,7 +277,13 @@ They cover the brief's table, the return to `PASS` without the delay, the
 float-noise cases, a three-turn report with no numeric p95, every parser case
 above, duplicates, greetings, overlapping contributions, unknown versions and
 structures, and a line of each event type from the real capture read back
-without losing a field.
+without losing a field. `tests/test_review_fixes.py` holds the cases found in
+review, each written before its fix: a manifest listing turns twice or of the
+wrong shape, an interruption before the first audio, an associated metric that
+does not exist, a stage on one side only, failed turns and the measured-turn
+floor, negative and non-finite durations, a reused event id, unreadable files
+and unwritable reports (exit 2, never 1), TTFA and TTFAT once per turn, a trace
+starting at 0.0, the median of an even count, and the terminal's precision.
 
 ## Versions
 

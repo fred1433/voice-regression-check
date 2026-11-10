@@ -69,10 +69,15 @@ def test_removing_the_delay_gives_pass_again(tmp_path):
 
 
 def test_regenerated_candidate_matches_the_committed_fixture(tmp_path):
-    from capture.synthetic_scenario import generate
-
-    generate(tmp_path / "candidate.jsonl", run_id="synthetic-candidate", config_id="candidate-llm-first-chunk-plus-500ms", delay_s=0.5)
-    assert (tmp_path / "candidate.jsonl").read_text() == open("fixtures/candidate.jsonl").read()
+    # In a fresh process and in the order scripts/make_fixtures.py uses
+    # (baseline, then candidate): Pipecat numbers its frames per process
+    # (MetricsFrame#N), so frames built by other tests here would shift the names.
+    code = ("import sys; from pathlib import Path; from capture.synthetic_scenario import generate; d = Path(sys.argv[1]); "
+            "generate(d / 'baseline.jsonl', run_id='synthetic-baseline', config_id='baseline', delay_s=0.0); "
+            "generate(d / 'candidate.jsonl', run_id='synthetic-candidate', config_id='candidate-llm-first-chunk-plus-500ms', delay_s=0.5)")
+    subprocess.run([sys.executable, "-c", code, str(tmp_path)], check=True)
+    for name in ("baseline.jsonl", "baseline.manifest.json", "candidate.jsonl", "candidate.manifest.json"):
+        assert (tmp_path / name).read_text() == open(f"fixtures/{name}").read(), name
 
 
 def test_removing_the_100_slow_traces_is_incomplete(tmp_path):

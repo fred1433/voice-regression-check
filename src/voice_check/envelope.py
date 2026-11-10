@@ -95,3 +95,13 @@ MEASURED_FROM = {"user_silence", "client_connected", None}
 CORE_USER_TURN_KEYS = ["endpointing_wait", "transcription", "turn_detection", "llm_inference", "speech_synthesis"]
 
 NO_AUDIO_MARKER = "completed with no audio"  # tts_service.py lines 2303-2322
+
+# Numeric fields of a metrics payload that are durations in seconds: each must
+# be a finite number >= 0 (pipecat/metrics/metrics.py, all typed ``float``).
+METRIC_DURATIONS = {
+    "TTFBMetricsData": ("value",),
+    "ProcessingMetricsData": ("value",),
+    "TextAggregationMetricsData": ("value",),
+    "TTFAMetricsData": ("ttfa", "ttfb", "leading_silence"),
+    "TTFATMetricsData": ("ttfat", "ttfb", "thinking_time"),
+}

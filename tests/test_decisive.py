@@ -133,18 +133,19 @@ def test_too_few_turns_is_incomplete_and_shows_no_p95(tmp_path):
 
 
 def test_failed_turns_can_fail_the_policy(tmp_path):
-    a = uniform(tmp_path / "a.jsonl", [0.4] * 300)
+    # 300 measured turns (the policy's floor) and 30 silent ones
+    a = uniform(tmp_path / "a.jsonl", [0.4] * 330)
     log = Log(run_id="r2", config_id="c2")
-    for i in range(300):
+    for i in range(330):
         s, t = f"s{i // 5:04d}", f"u{i % 5 + 1}"
-        if i < 30:  # 10% silent turns
+        if i < 30:  # 9% silent turns
             log.add(s, t, "no_audio", "error", "ErrorFrame",
                     {"error": f"TTS context {i} completed with no audio", "fatal": False, "category": None, "processor": "TTS#0"})
         else:
             log.turn(s, t, 0.4)
     rep = _cmp(a, log.write(tmp_path / "b.jsonl"))
     assert rep["verdict"] == "FAIL" and rep["evaluation"]["value_is_failed_turn"] is True
-    assert rep["runs"]["candidate"]["total"]["n"] == 300
+    assert rep["runs"]["candidate"]["total"]["n"] == 330
 
 
 def test_published_breakdown_never_changes_the_verdict(tmp_path):

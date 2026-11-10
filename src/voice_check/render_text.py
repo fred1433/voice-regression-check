@@ -4,20 +4,30 @@ from __future__ import annotations
 
 
 def _ms(v) -> str:
+    """Whole milliseconds from 1 s up (7,856 ms); below, up to the microsecond
+    the comparison uses (420.001 ms), without trailing zeros."""
     if v is None:
         return "n/a"
-    return f"{v:,.0f} ms" if float(v).is_integer() else f"{v:,.3f} ms"
+    if abs(v) >= 1000 or float(v).is_integer():
+        return f"{v:,.0f} ms"
+    return f"{v:,.3f}".rstrip("0").rstrip(".") + " ms"
 
 
 def _dist(d: dict) -> str:
-    med = "failed turn" if d.get("median_is_failed_turn") else _ms(d.get("median_ms"))
+    med = d["median_note"] if d.get("median_note") else f"median {_ms(d.get('median_ms'))}"
     if d.get("p95_ms") is None and d.get("p95_note"):
-        return f"median {med}, {d['p95_note']}"
-    elif d.get("p95_is_failed_turn"):
-        p95 = "p95 is a failed turn"
+        p95 = d["p95_note"]
+        if p95.startswith("p95 not shown"):
+            return f"{med}, {p95}"
     else:
         p95 = f"p95 {_ms(d.get('p95_ms'))}"
-    return f"median {med}, {p95} (N = {d['n']:,})"
+    return f"{med}, {p95} (N = {d['n']:,})"
+
+
+def _ident(s: dict) -> str:
+    if s.get("config_id") is None:
+        return "log not read"
+    return f"{s['config_id']}  [{s['provenance']}, backend {s['inference_backend']}]"
 
 
 def _counts(c: dict) -> str:
@@ -42,13 +52,17 @@ def render(report: dict) -> str:
     out.append(f"Policy  {pol['path']}: turn total {rule['statistic']} {rule['operator']} {_ms(rule['threshold_ms'])} ({pol['nature']})")
     for name in ("baseline", "candidate"):
         s = report["runs"][name]
-        out.append(f"{name.capitalize():<10}{s['config_id']}  [{s['provenance']}, backend {s['inference_backend']}]")
+        out.append(f"{name.capitalize():<10}{_ident(s)}")
         out.append(f"          {_dist(s['total'])}")
         out.append(f"          {_counts(s['counts'])}")
     ev = report.get("evaluation")
     if ev:
         out.append("")
-        out.append(f"Candidate p95 {_ms(ev['value_ms'])} {ev['operator']} {_ms(ev['threshold_ms'])}: {'yes' if ev['passed'] else 'no'} (N = {ev['n']:,})")
+        verdict = "yes" if ev["passed"] else "no"
+        if ev.get("value_note"):
+            out.append(f"Candidate p95 {ev['operator']} {_ms(ev['threshold_ms'])}: {verdict}, the {ev['value_note']} (N = {ev['n']:,})")
+        else:
+            out.append(f"Candidate p95 {_ms(ev['value_ms'])} {ev['operator']} {_ms(ev['threshold_ms'])}: {verdict} (N = {ev['n']:,})")
     ch = report.get("change")
     if ch and ch["affected_turns"]:
         f = ch["facts"]
@@ -78,14 +92,15 @@ def render(report: dict) -> str:
 
 def _render_single(report: dict) -> str:
     s = report["run"]
-    out = [report["label"], f"{s['config_id']}  [{s['provenance']}, backend {s['inference_backend']}]", f"  {_counts(s['counts'])}"]
+    out = [report["label"], _ident(s), f"  {_counts(s['counts'])}"]
     t = s["total"]
     out.append(f"  user turns: {_dist(t)}, min {_ms(t.get('min_ms'))}, max {_ms(t.get('max_ms'))}")
     g = s["greetings"]
     if g["n"]:
         out.append(f"  greetings (kept apart): {_dist(g)}")
     out.append("")
-    out.append(f"  {'turn':<12}{'status':<28}{'total':>12}")
+    if report["turn_table"]:
+        out.append(f"  {'turn':<12}{'status':<28}{'total':>12}")
     for row in report["turn_table"]:
         out.append(f"  {row['session_id'] + '/' + row['turn_id']:<12}{row['status']:<28}{_ms(row['total_ms']):>12}")
     for e in s["input_errors"][:10]:
